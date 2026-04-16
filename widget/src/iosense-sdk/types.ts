@@ -99,6 +99,8 @@ export interface GaugeStyleConfig {
 }
 
 export interface TimeDisplayConfig {
+  type: 'local' | 'fixed';             // local = show DatePicker; fixed = show label only
+  defaultPeriodicity: 'minute' | 'hourly' | 'daily' | 'weekly' | 'monthly';
   allDurations: DurationOption[];
   defaultDurationLabel: string;
 }
@@ -217,6 +219,12 @@ export const DEFAULT_UI_CONFIG: GaugeUIConfig = {
       dialColor: '#333333',
       pivotColor: '#333333',
     },
+  },
+  time: {
+    type: 'local',
+    defaultPeriodicity: 'hourly',
+    allDurations: [],
+    defaultDurationLabel: 'Last 1 Hour',
   },
 };
 

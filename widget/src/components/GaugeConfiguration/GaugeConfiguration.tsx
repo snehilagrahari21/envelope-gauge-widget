@@ -30,6 +30,7 @@ import {
   ApiConfig,
   DataSourceConfig,
   TimeConfig,
+  DurationOption,
   GaugeBand,
   SourceType,
   DEFAULT_ENVELOPE,
@@ -201,11 +202,24 @@ const GaugeConfiguration: React.FC<ConfigurationProps> = ({
     });
   };
 
-  // Update timeConfig
+  // Update timeConfig — also mirrors relevant fields into uiConfig.time
+  // so the widget knows time display settings without touching apiConfig/timeConfig directly
   const updateTime = (updates: Partial<TimeConfig>) => {
+    const updatedTimeConfig = { ...timeConfig, ...updates };
     emitChange({
       ...envelope,
-      timeConfig: { ...timeConfig, ...updates },
+      timeConfig: updatedTimeConfig,
+      uiConfig: {
+        ...uiConfig,
+        time: {
+          type: updatedTimeConfig.type === 'fixed' ? 'fixed' : 'local',
+          defaultPeriodicity: updatedTimeConfig.defaultPeriodicity,
+          allDurations: updatedTimeConfig.allDurations,
+          defaultDurationLabel: updatedTimeConfig.allDurations.find(
+            (d: DurationOption) => d.id === updatedTimeConfig.defaultDuration
+          )?.name ?? updatedTimeConfig.defaultDuration,
+        },
+      },
     });
   };
 

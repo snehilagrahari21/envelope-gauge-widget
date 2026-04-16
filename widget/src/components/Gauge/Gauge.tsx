@@ -14,9 +14,25 @@ import Highcharts from 'highcharts';
 import HighchartsMore from 'highcharts/highcharts-more';
 import SolidGauge from 'highcharts/modules/solid-gauge';
 import HighchartsReact from 'highcharts-react-official';
-import { Spinner } from '@faclon-labs/design-sdk';
+import {
+  Spinner,
+  DatePicker,
+  SelectInput,
+  DropdownMenu,
+  ActionListItem,
+} from '@faclon-labs/design-sdk';
 import { WidgetProps, GaugeUIConfig, WidgetData, DEFAULT_UI_CONFIG } from '../../iosense-sdk/types';
 import './Gauge.css';
+
+type DateRange = { start: Date; end: Date };
+
+const PERIODICITIES = [
+  { label: 'Minute',  value: 'minute'  },
+  { label: 'Hourly',  value: 'hourly'  },
+  { label: 'Daily',   value: 'daily'   },
+  { label: 'Weekly',  value: 'weekly'  },
+  { label: 'Monthly', value: 'monthly' },
+];
 
 HighchartsMore(Highcharts);
 SolidGauge(Highcharts);
@@ -43,6 +59,45 @@ const Gauge: React.FC<WidgetProps> = ({ config: configProp, data, onEvent }) => 
     console.log('[Gauge] data prop synced to state', data);
     setCurrentData(data);
   }, [data]);
+
+  // Time picker state — default to last 1 hour
+  const defaultEnd = new Date();
+  const defaultStart = new Date(defaultEnd.getTime() - 60 * 60 * 1000);
+  const [dateRange, setDateRange] = useState<DateRange>({ start: defaultStart, end: defaultEnd });
+  const [periodicity, setPeriodicity] = useState<string>(
+    config?.time?.defaultPeriodicity ?? 'hourly'
+  );
+  const [periodicityOpen, setPeriodicityOpen] = useState(false);
+
+  // Keep periodicity in sync if config changes
+  useEffect(() => {
+    if (config?.time?.defaultPeriodicity) {
+      setPeriodicity(config.time.defaultPeriodicity);
+    }
+  }, [config?.time?.defaultPeriodicity]);
+
+  const emitTimeChange = (range: DateRange, pct: string) => {
+    const payload = {
+      startTime: range.start.toISOString(),
+      endTime:   range.end.toISOString(),
+      periodicity: pct,
+    };
+    console.log('[Gauge] onEvent → TIME_CHANGE emitted', payload);
+    onEvent({ type: 'TIME_CHANGE', payload });
+  };
+
+  const handleRangeChange = (range: DateRange | null) => {
+    if (!range) return;
+    setDateRange(range);
+    emitTimeChange(range, periodicity);
+  };
+
+  const handlePeriodicityChange = (value: string) => {
+    setPeriodicity(value);
+    setPeriodicityOpen(false);
+    emitTimeChange(dateRange, value);
+    console.log('[Gauge] periodicity changed', value);
+  };
 
   const chart = config?.charts?.[0];
   const style = config?.style ?? DEFAULT_UI_CONFIG.style;
@@ -193,6 +248,36 @@ const Gauge: React.FC<WidgetProps> = ({ config: configProp, data, onEvent }) => 
           </span>
         </div>
       )}
+
+      {/* Row 2: Time picker — hidden when time type is "fixed" */}
+      {config.time?.type !== 'fixed' && (
+        <div className="gauge-widget__time-row">
+          <DatePicker
+            mode="range"
+            rangeValue={dateRange}
+            onRangeChange={handleRangeChange}
+            label=""
+            placeholder="Select date range"
+          />
+          <SelectInput
+            label=""
+            value={PERIODICITIES.find((p) => p.value === periodicity)?.label ?? periodicity}
+            isOpen={periodicityOpen}
+            onClick={() => setPeriodicityOpen(!periodicityOpen)}
+          >
+            <DropdownMenu>
+              {PERIODICITIES.map((p) => (
+                <ActionListItem
+                  id={p.value}
+                  title={p.label}
+                  onClick={() => handlePeriodicityChange(p.value)}
+                />
+              ))}
+            </DropdownMenu>
+          </SelectInput>
+        </div>
+      )}
+
       <div className="gauge-widget__chart">
         <HighchartsReact
           highcharts={Highcharts}
