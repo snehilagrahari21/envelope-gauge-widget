@@ -1,3 +1,12 @@
+// ============================================================================
+// Gauge Configurator — Produces the three-key envelope (Envelope.md)
+// Output: { timeConfig, apiConfig, uiConfig }
+//   - Data Source tab  → builds apiConfig (endpoint, method, headers, body)
+//   - Time Settings tab → builds timeConfig (timezone, durations, periodicity)
+//   - Appearance tab   → builds uiConfig (chart config, styling)
+// _id values in apiConfig.dataConfig MUST match uiConfig.charts exactly.
+// ============================================================================
+
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import {
   Tabs,
@@ -12,14 +21,18 @@ import {
   Button,
   DropdownMenu,
   ActionListItem,
-  Spinner,
 } from '@faclon-labs/design-sdk';
 import {
   ConfigurationProps,
-  GaugeWidgetConfig,
+  WidgetConfigEnvelope,
+  GaugeUIConfig,
+  GaugeChartConfig,
+  ApiConfig,
+  DataSourceConfig,
+  TimeConfig,
   GaugeBand,
   SourceType,
-  DEFAULT_GAUGE_CONFIG,
+  DEFAULT_ENVELOPE,
 } from '../../iosense-sdk/types';
 import { findUserDevices, getDeviceMetadata } from '../../iosense-sdk/api';
 import './GaugeConfiguration.css';
@@ -54,7 +67,7 @@ const GaugeConfiguration: React.FC<ConfigurationProps> = ({
   });
 
   const [activeTab, setActiveTab] = useState(0);
-  const [config, setConfig] = useState<GaugeWidgetConfig>(configProp ?? DEFAULT_GAUGE_CONFIG);
+  const [envelope, setEnvelope] = useState<WidgetConfigEnvelope>(configProp ?? DEFAULT_ENVELOPE);
 
   // Device search state
   const [deviceSearch, setDeviceSearch] = useState('');
@@ -67,10 +80,8 @@ const GaugeConfiguration: React.FC<ConfigurationProps> = ({
   const [sensorsLoading, setSensorsLoading] = useState(false);
   const [sensorDropdownOpen, setSensorDropdownOpen] = useState(false);
 
-  // Operator dropdown
+  // Dropdown states
   const [operatorDropdownOpen, setOperatorDropdownOpen] = useState(false);
-
-  // Periodicity dropdown
   const [periodicityDropdownOpen, setPeriodicityDropdownOpen] = useState(false);
 
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -78,18 +89,26 @@ const GaugeConfiguration: React.FC<ConfigurationProps> = ({
   // Sync config prop to state
   useEffect(() => {
     console.log('[GaugeConfig] config prop synced to state', configProp);
-    setConfig(configProp ?? DEFAULT_GAUGE_CONFIG);
+    setEnvelope(configProp ?? DEFAULT_ENVELOPE);
   }, [configProp]);
 
-  // Emit onChange
+  // Emit onChange — always emits the full three-key envelope
   const emitChange = useCallback(
-    (updated: GaugeWidgetConfig) => {
-      console.log('[GaugeConfig] emitChange — onChange fired', updated);
-      setConfig(updated);
+    (updated: WidgetConfigEnvelope) => {
+      console.log('[GaugeConfig] emitChange — full envelope emitted', updated);
+      setEnvelope(updated);
       onChange(updated);
     },
     [onChange]
   );
+
+  // Shorthand accessors
+  const uiConfig = envelope.uiConfig;
+  const apiConfig = envelope.apiConfig;
+  const timeConfig = envelope.timeConfig;
+  const chart = uiConfig.charts[0] ?? DEFAULT_ENVELOPE.uiConfig.charts[0];
+  const dataSource = apiConfig.dataConfig[0] ?? DEFAULT_ENVELOPE.apiConfig.dataConfig[0];
+  const style = uiConfig.style;
 
   // Device search with debounce
   useEffect(() => {
@@ -112,8 +131,8 @@ const GaugeConfiguration: React.FC<ConfigurationProps> = ({
   }, [deviceSearch, authentication]);
 
   // Load sensors when device selected
+  const devID = dataSource.body?.devID;
   useEffect(() => {
-    const devID = config.charts[0]?.dataConfig?.devID;
     if (!devID || !authentication) {
       setSensors([]);
       return;
@@ -127,34 +146,59 @@ const GaugeConfiguration: React.FC<ConfigurationProps> = ({
       setSensorsLoading(false);
     };
     loadSensors();
-  }, [config.charts[0]?.dataConfig?.devID, authentication]);
+  }, [devID, authentication]);
 
-  const chart = config.charts[0] ?? DEFAULT_GAUGE_CONFIG.charts[0];
-  const dc = chart.dataConfig;
-  const style = config.style;
+  // === Updaters ===
 
-  const updateChart = (updates: Record<string, any>) => {
-    const updated = {
-      ...config,
-      charts: [{ ...chart, ...updates }],
+  // Update apiConfig.dataConfig[0].body fields
+  const updateDataBody = (updates: Record<string, any>) => {
+    const updatedBody = { ...dataSource.body, ...updates };
+    const updatedDataConfig: DataSourceConfig = { ...dataSource, body: updatedBody };
+    const updatedApiConfig: ApiConfig = {
+      ...apiConfig,
+      dataConfig: [updatedDataConfig],
     };
-    emitChange(updated);
+    emitChange({ ...envelope, apiConfig: updatedApiConfig });
   };
 
-  const updateDataConfig = (updates: Record<string, any>) => {
-    updateChart({ dataConfig: { ...dc, ...updates } });
+  // Update apiConfig.dataConfig[0] top-level fields (label, responsePath)
+  const updateDataSource = (updates: Partial<DataSourceConfig>) => {
+    const updatedDataConfig: DataSourceConfig = { ...dataSource, ...updates };
+    emitChange({
+      ...envelope,
+      apiConfig: { ...apiConfig, dataConfig: [updatedDataConfig] },
+    });
   };
 
+  // Update uiConfig.charts[0] fields
+  const updateChart = (updates: Partial<GaugeChartConfig>) => {
+    const updatedChart = { ...chart, ...updates };
+    emitChange({
+      ...envelope,
+      uiConfig: { ...uiConfig, charts: [updatedChart] },
+    });
+  };
+
+  // Update uiConfig.style
   const updateStyle = (section: 'card' | 'gauge', updates: Record<string, any>) => {
     emitChange({
-      ...config,
-      style: {
-        ...style,
-        [section]: { ...style[section], ...updates },
+      ...envelope,
+      uiConfig: {
+        ...uiConfig,
+        style: { ...style, [section]: { ...style[section], ...updates } },
       },
     });
   };
 
+  // Update timeConfig
+  const updateTime = (updates: Partial<TimeConfig>) => {
+    emitChange({
+      ...envelope,
+      timeConfig: { ...timeConfig, ...updates },
+    });
+  };
+
+  // Update bands
   const updateBand = (index: number, updates: Partial<GaugeBand>) => {
     const bands = [...chart.bands];
     bands[index] = { ...bands[index], ...updates };
@@ -172,24 +216,31 @@ const GaugeConfiguration: React.FC<ConfigurationProps> = ({
     updateChart({ bands: chart.bands.filter((_, i) => i !== index) });
   };
 
-  // === DATA TAB ===
+  // Current source type from apiConfig body
+  const sourceType: SourceType = dataSource.body?.type ?? 'device';
+
+  // === TAB 1: DATA ===
   const renderDataTab = () => (
     <div className="gauge-config__tab-content">
       <Accordion mode="multiple" defaultExpandedKeys={['data-source', 'gauge-range']}>
-        {/* Data Source */}
+        {/* Data Source — builds apiConfig */}
         <AccordionItem value="data-source" title="Data Source">
           <div className="gauge-config__accordion-body">
+            {/* Title goes to uiConfig */}
             <TextInput
               label="Title"
               value={chart.title ?? ''}
-              onChange={({ value }) => updateChart({ title: value })}
+              onChange={({ value }) => {
+                updateChart({ title: value });
+                updateDataSource({ label: value || 'Gauge Value' });
+              }}
               placeholder="Gauge title"
             />
 
             <RadioGroup
               name="sourceType"
-              value={dc.type}
-              onChange={(val) => updateDataConfig({ type: val as SourceType })}
+              value={sourceType}
+              onChange={(val) => updateDataBody({ type: val as SourceType })}
               label="Source Type"
               orientation="Horizontal"
             >
@@ -199,7 +250,7 @@ const GaugeConfiguration: React.FC<ConfigurationProps> = ({
               <Radio label="Expression" value="customExpression" />
             </RadioGroup>
 
-            {dc.type === 'device' && (
+            {sourceType === 'device' && (
               <>
                 <TextInput
                   label="Search Device"
@@ -218,7 +269,7 @@ const GaugeConfiguration: React.FC<ConfigurationProps> = ({
                         id={dev._id}
                         title={dev.d ?? dev._id}
                         onClick={() => {
-                          updateDataConfig({
+                          updateDataBody({
                             devID: dev._id,
                             devTypeID: dev.dvT?.dvTN ?? '',
                           });
@@ -233,12 +284,12 @@ const GaugeConfiguration: React.FC<ConfigurationProps> = ({
                 <SelectInput
                   label="Sensor"
                   value={
-                    sensors.find((s: any) => s.sensorId === dc.sensor)?.sensorName
-                    ?? dc.sensor
+                    sensors.find((s: any) => s.sensorId === dataSource.body?.sensor)?.sensorName
+                    ?? dataSource.body?.sensor
                     ?? ''
                   }
                   placeholder={sensorsLoading ? 'Loading...' : 'Select sensor'}
-                  isDisabled={!dc.devID || sensorsLoading}
+                  isDisabled={!dataSource.body?.devID || sensorsLoading}
                   isOpen={sensorDropdownOpen}
                   onClick={() => setSensorDropdownOpen(!sensorDropdownOpen)}
                 >
@@ -248,7 +299,7 @@ const GaugeConfiguration: React.FC<ConfigurationProps> = ({
                         id={s.sensorId}
                         title={s.sensorName ?? s.sensorId}
                         onClick={() => {
-                          updateDataConfig({ sensor: s.sensorId });
+                          updateDataBody({ sensor: s.sensorId });
                           setSensorDropdownOpen(false);
                         }}
                       />
@@ -258,7 +309,7 @@ const GaugeConfiguration: React.FC<ConfigurationProps> = ({
 
                 <SelectInput
                   label="Operator"
-                  value={OPERATORS.find((o) => o.value === dc.operator)?.label ?? dc.operator ?? ''}
+                  value={OPERATORS.find((o) => o.value === dataSource.body?.operator)?.label ?? dataSource.body?.operator ?? ''}
                   isOpen={operatorDropdownOpen}
                   onClick={() => setOperatorDropdownOpen(!operatorDropdownOpen)}
                 >
@@ -268,7 +319,7 @@ const GaugeConfiguration: React.FC<ConfigurationProps> = ({
                         id={op.value}
                         title={op.label}
                         onClick={() => {
-                          updateDataConfig({ operator: op.value });
+                          updateDataBody({ operator: op.value });
                           setOperatorDropdownOpen(false);
                         }}
                       />
@@ -278,17 +329,17 @@ const GaugeConfiguration: React.FC<ConfigurationProps> = ({
               </>
             )}
 
-            {dc.type === 'cluster' && (
+            {sourceType === 'cluster' && (
               <>
                 <TextInput
                   label="Cluster ID"
-                  value={dc.clusterID ?? ''}
-                  onChange={({ value }) => updateDataConfig({ clusterID: value })}
+                  value={dataSource.body?.clusterID ?? ''}
+                  onChange={({ value }) => updateDataBody({ clusterID: value })}
                   placeholder="Enter cluster ID"
                 />
                 <SelectInput
                   label="Operator"
-                  value={OPERATORS.find((o) => o.value === dc.operator)?.label ?? ''}
+                  value={OPERATORS.find((o) => o.value === dataSource.body?.operator)?.label ?? ''}
                   isOpen={operatorDropdownOpen}
                   onClick={() => setOperatorDropdownOpen(!operatorDropdownOpen)}
                 >
@@ -298,7 +349,7 @@ const GaugeConfiguration: React.FC<ConfigurationProps> = ({
                         id={op.value}
                         title={op.label}
                         onClick={() => {
-                          updateDataConfig({ operator: op.value });
+                          updateDataBody({ operator: op.value });
                           setOperatorDropdownOpen(false);
                         }}
                       />
@@ -308,49 +359,50 @@ const GaugeConfiguration: React.FC<ConfigurationProps> = ({
               </>
             )}
 
-            {dc.type === 'compute' && (
+            {sourceType === 'compute' && (
               <>
                 <TextInput
                   label="Flow ID"
-                  value={dc.flowID ?? ''}
-                  onChange={({ value }) => updateDataConfig({ flowID: value })}
+                  value={dataSource.body?.flowID ?? ''}
+                  onChange={({ value }) => updateDataBody({ flowID: value })}
                   placeholder="Enter flow ID"
                 />
                 <TextInput
                   label="Flow Parameters"
-                  value={dc.flowParams ?? ''}
-                  onChange={({ value }) => updateDataConfig({ flowParams: value })}
+                  value={dataSource.body?.flowParams ?? ''}
+                  onChange={({ value }) => updateDataBody({ flowParams: value })}
                   placeholder="Enter flow parameters"
                 />
               </>
             )}
 
-            {dc.type === 'customExpression' && (
+            {sourceType === 'customExpression' && (
               <TextInput
                 label="Bindings"
-                value={dc.bindings ?? ''}
-                onChange={({ value }) => updateDataConfig({ bindings: value })}
+                value={dataSource.body?.bindings ?? ''}
+                onChange={({ value }) => updateDataBody({ bindings: value })}
                 placeholder="Enter expression bindings"
               />
             )}
 
+            {/* Unit + precision go to uiConfig (rendering concern) */}
             <TextInput
               label="Unit"
-              value={dc.unit ?? ''}
-              onChange={({ value }) => updateDataConfig({ unit: value })}
+              value={chart.unit ?? ''}
+              onChange={({ value }) => updateChart({ unit: value })}
               placeholder="e.g. °C, kWh, %"
             />
 
             <TextInput
               label="Data Precision"
               type="number"
-              value={String(dc.dataPrecision ?? 2)}
-              onChange={({ value }) => updateDataConfig({ dataPrecision: parseInt(value) || 0 })}
+              value={String(chart.dataPrecision ?? 2)}
+              onChange={({ value }) => updateChart({ dataPrecision: parseInt(value) || 0 })}
             />
           </div>
         </AccordionItem>
 
-        {/* Gauge Range & Bands */}
+        {/* Gauge Range & Bands — uiConfig concern */}
         <AccordionItem value="gauge-range" title="Gauge Range & Bands">
           <div className="gauge-config__accordion-body">
             <div className="gauge-config__row">
@@ -418,60 +470,41 @@ const GaugeConfiguration: React.FC<ConfigurationProps> = ({
     </div>
   );
 
-  // === TIME TAB ===
-  const renderTimeTab = () => {
-    const time = config.time ?? {
-      timezone: 'Asia/Kolkata',
-      type: 'local',
-      startTime: null,
-      endTime: null,
-      defaultDuration: 'today',
-      defaultPeriodicity: 'hourly' as const,
-      allDurations: [],
-    };
+  // === TAB 2: TIME — builds timeConfig ===
+  const renderTimeTab = () => (
+    <div className="gauge-config__tab-content">
+      <div className="gauge-config__section">
+        <TextInput
+          label="Timezone"
+          value={timeConfig.timezone}
+          onChange={({ value }) => updateTime({ timezone: value })}
+          placeholder="e.g. Asia/Kolkata"
+        />
 
-    const updateTime = (updates: Record<string, any>) => {
-      emitChange({
-        ...config,
-        time: { ...time, ...updates },
-      });
-    };
-
-    return (
-      <div className="gauge-config__tab-content">
-        <div className="gauge-config__section">
-          <TextInput
-            label="Timezone"
-            value={time.timezone}
-            onChange={({ value }) => updateTime({ timezone: value })}
-            placeholder="e.g. Asia/Kolkata"
-          />
-
-          <SelectInput
-            label="Default Periodicity"
-            value={PERIODICITIES.find((p) => p.value === time.defaultPeriodicity)?.label ?? ''}
-            isOpen={periodicityDropdownOpen}
-            onClick={() => setPeriodicityDropdownOpen(!periodicityDropdownOpen)}
-          >
-            <DropdownMenu>
-              {PERIODICITIES.map((p) => (
-                <ActionListItem
-                  id={p.value}
-                  title={p.label}
-                  onClick={() => {
-                    updateTime({ defaultPeriodicity: p.value });
-                    setPeriodicityDropdownOpen(false);
-                  }}
-                />
-              ))}
-            </DropdownMenu>
-          </SelectInput>
-        </div>
+        <SelectInput
+          label="Default Periodicity"
+          value={PERIODICITIES.find((p) => p.value === timeConfig.defaultPeriodicity)?.label ?? ''}
+          isOpen={periodicityDropdownOpen}
+          onClick={() => setPeriodicityDropdownOpen(!periodicityDropdownOpen)}
+        >
+          <DropdownMenu>
+            {PERIODICITIES.map((p) => (
+              <ActionListItem
+                id={p.value}
+                title={p.label}
+                onClick={() => {
+                  updateTime({ defaultPeriodicity: p.value as any });
+                  setPeriodicityDropdownOpen(false);
+                }}
+              />
+            ))}
+          </DropdownMenu>
+        </SelectInput>
       </div>
-    );
-  };
+    </div>
+  );
 
-  // === STYLE TAB ===
+  // === TAB 3: STYLE — builds uiConfig.style ===
   const renderStyleTab = () => (
     <div className="gauge-config__tab-content">
       <Accordion mode="multiple" defaultExpandedKeys={['card-style']}>

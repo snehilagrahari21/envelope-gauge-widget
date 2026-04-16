@@ -1,125 +1,74 @@
+// ============================================================================
+// Gauge Widget — Pure UI Renderer (Envelope.md compliant)
+// ✅ Reads props.config (uiConfig) to render UI
+// ✅ Reads props.data to populate gauge value
+// ✅ Calls props.onEvent() on user interactions
+// ✅ Shows loading skeleton when data === null
+// ❌ No fetch, axios, HttpClient — DataLayer's job
+// ❌ No authentication — DataLayer handles auth
+// ❌ No API endpoints or credentials
+// ============================================================================
+
 import React, { useState, useEffect, useRef, useMemo } from 'react';
 import Highcharts from 'highcharts';
 import HighchartsMore from 'highcharts/highcharts-more';
 import SolidGauge from 'highcharts/modules/solid-gauge';
 import HighchartsReact from 'highcharts-react-official';
 import { Spinner } from '@faclon-labs/design-sdk';
-import { WidgetProps, GaugeWidgetConfig, DEFAULT_GAUGE_CONFIG } from '../../iosense-sdk/types';
-import { getWidgetData } from '../../iosense-sdk/api';
+import { WidgetProps, GaugeUIConfig, WidgetData, DEFAULT_UI_CONFIG } from '../../iosense-sdk/types';
 import './Gauge.css';
 
 HighchartsMore(Highcharts);
 SolidGauge(Highcharts);
 
-const Gauge: React.FC<WidgetProps> = ({
-  config: configProp,
-  data: dataProp,
-  authentication,
-  timeChange,
-}) => {
+const Gauge: React.FC<WidgetProps> = ({ config: configProp, data, onEvent }) => {
   console.log('[Gauge] render — props received', {
     config: configProp,
-    data: dataProp,
-    authentication: authentication ? `${authentication.substring(0, 20)}...` : undefined,
-    hasTimeChange: !!timeChange,
+    data,
+    hasOnEvent: !!onEvent,
   });
 
-  const [config, setConfig] = useState<GaugeWidgetConfig>(configProp ?? DEFAULT_GAUGE_CONFIG);
-  const [gaugeValue, setGaugeValue] = useState<number | null>(null);
-  const [loading, setLoading] = useState(false);
-  const chartRef = useRef<HighchartsReact.RefObject>(null);
-
   // Sync config prop to state (required for Lens update() lifecycle)
+  const [config, setConfig] = useState<GaugeUIConfig>(configProp ?? DEFAULT_UI_CONFIG);
+
   useEffect(() => {
     console.log('[Gauge] config prop synced to state', configProp);
-    setConfig(configProp ?? DEFAULT_GAUGE_CONFIG);
+    setConfig(configProp ?? DEFAULT_UI_CONFIG);
   }, [configProp]);
 
-  // Sync data prop (passive render path)
+  // Sync data prop to state (required for Lens update() lifecycle)
+  const [currentData, setCurrentData] = useState<WidgetData | null>(data);
+
   useEffect(() => {
-    if (dataProp !== undefined && dataProp !== null) {
-      console.log('[Gauge] data prop received (passive path)', dataProp);
-      const chart = config.charts[0];
-      const chartId = chart?.title ?? 'gauge-0';
-      const val = (dataProp as any)[chartId];
-      console.log('[Gauge] extracted value from data prop', { chartId, val });
-      if (typeof val === 'number') {
-        setGaugeValue(val);
-      } else if (Array.isArray(val) && val.length > 0) {
-        setGaugeValue(Number(val[0]?.value ?? val[0]) || 0);
-      }
-    } else {
-      console.log('[Gauge] data prop is undefined/null — will self-fetch if configured');
-    }
-  }, [dataProp, config]);
-
-  // Self-fetch path: when data prop is undefined, fetch using dataConfig
-  useEffect(() => {
-    if (dataProp !== undefined) {
-      console.log('[Gauge] self-fetch skipped — data prop provided');
-      return;
-    }
-    if (!authentication) {
-      console.log('[Gauge] self-fetch skipped — no authentication');
-      return;
-    }
-    if (!config?.charts?.[0]?.dataConfig?.devID) {
-      console.log('[Gauge] self-fetch skipped — no devID configured');
-      return;
-    }
-
-    const chart = config.charts[0];
-    const dc = chart.dataConfig;
-
-    const fetchData = async () => {
-      setLoading(true);
-      const now = new Date();
-      const oneHourAgo = new Date(now.getTime() - 60 * 60 * 1000);
-      const requestBody = {
-        devID: dc.devID,
-        devTypeID: dc.devTypeID,
-        sensor: dc.sensor,
-        operator: dc.operator ?? 'LastDP',
-        startTime: oneHourAgo.toISOString(),
-        endTime: now.toISOString(),
-        periodicity: config.time?.defaultPeriodicity ?? 'hourly',
-      };
-      console.log('[Gauge] self-fetch — calling getWidgetData', requestBody);
-
-      try {
-        const result = await getWidgetData(authentication, requestBody);
-        console.log('[Gauge] self-fetch — raw API response', result);
-
-        if (result !== null) {
-          const value = typeof result === 'number'
-            ? result
-            : Array.isArray(result) && result.length > 0
-              ? Number(result[0]?.value ?? result[0]) || 0
-              : 0;
-          console.log('[Gauge] self-fetch — resolved gauge value', value);
-          setGaugeValue(value);
-        } else {
-          console.warn('[Gauge] self-fetch — API returned null');
-        }
-      } catch (err) {
-        console.error('[Gauge] self-fetch — error', err);
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    fetchData();
-  }, [dataProp, authentication, config]);
+    console.log('[Gauge] data prop synced to state', data);
+    setCurrentData(data);
+  }, [data]);
 
   const chart = config?.charts?.[0];
-  const style = config?.style ?? DEFAULT_GAUGE_CONFIG.style;
+  const style = config?.style ?? DEFAULT_UI_CONFIG.style;
+
+  // Extract gauge value from data keyed by _id
+  const gaugeValue = useMemo(() => {
+    if (!currentData || !chart) return null;
+    const chartData = currentData[chart._id];
+    console.log('[Gauge] extracting value from data', { chartId: chart._id, chartData });
+
+    if (chartData === undefined || chartData === null) return null;
+    if (typeof chartData === 'number') return chartData;
+    if (Array.isArray(chartData) && chartData.length > 0) {
+      return Number(chartData[0]?.value ?? chartData[0]) || 0;
+    }
+    return null;
+  }, [currentData, chart]);
+
+  const chartRef = useRef<HighchartsReact.RefObject>(null);
 
   const chartOptions: Highcharts.Options = useMemo(() => {
     const min = chart?.min ?? 0;
     const max = chart?.max ?? 100;
     const bands = chart?.bands ?? [];
-    const unit = chart?.dataConfig?.unit ?? '';
-    const precision = chart?.dataConfig?.dataPrecision ?? 2;
+    const unit = chart?.unit ?? '';
+    const precision = chart?.dataPrecision ?? 2;
 
     return {
       chart: {
@@ -197,10 +146,16 @@ const Gauge: React.FC<WidgetProps> = ({
     };
   }, [chart, style, gaugeValue]);
 
-  console.log('[Gauge] pre-render state', { gaugeValue, loading, hasChart: !!chart, configCharts: config?.charts?.length });
+  console.log('[Gauge] pre-render state', {
+    gaugeValue,
+    dataIsNull: currentData === null,
+    hasChart: !!chart,
+    chartId: chart?._id,
+  });
 
-  // Loading state
-  if (loading && gaugeValue === null) {
+  // ✅ Loading skeleton when data === null (DataLayer still fetching)
+  if (currentData === null) {
+    console.log('[Gauge] rendering loading skeleton — data is null');
     return (
       <div className="gauge-widget gauge-widget--loading">
         <Spinner />
