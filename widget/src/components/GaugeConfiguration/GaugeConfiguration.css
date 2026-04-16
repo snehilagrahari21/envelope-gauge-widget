@@ -1,0 +1,64 @@
+.gauge-config {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  overflow-y: auto;
+}
+
+.gauge-config__tab-content {
+  padding: var(--spacing-04, 12px);
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-04, 12px);
+}
+
+.gauge-config__section {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-04, 12px);
+}
+
+.gauge-config__accordion-body {
+  width: 100%;
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-04, 12px);
+}
+
+.gauge-config__row {
+  display: flex;
+  flex-direction: row;
+  gap: var(--spacing-03, 8px);
+  align-items: flex-end;
+}
+
+.gauge-config__row > * {
+  flex: 1;
+}
+
+.gauge-config__color-swatch {
+  width: 32px;
+  height: 32px;
+  min-width: 32px;
+  border-radius: var(--global-border-radius-medium, 4px);
+  border: var(--fds-border-default, 1px solid #e0e0e0);
+  flex: 0 0 32px;
+}
+
+.gauge-config__bands-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: var(--spacing-03, 8px) 0;
+}
+
+.gauge-config__band {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-03, 8px);
+  padding: var(--spacing-03, 8px);
+  border: var(--fds-border-subtle, 1px solid #f0f0f0);
+  border-radius: var(--global-border-radius-medium, 4px);
+}
