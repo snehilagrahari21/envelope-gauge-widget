@@ -43,7 +43,17 @@ const App: React.FC = () => {
     overrides?: { startTime?: string; endTime?: string; periodicity?: string }
   ) => {
     if (!auth) {
-      console.log('[App/DataLayer] skipping fetch — no authentication');
+      console.log('[App/DataLayer] skipping fetch — no authentication, setting data to {} so widget renders');
+      setFetchError(null);
+      setWidgetData({});   // {} = "DataLayer done, no data" — prevents infinite loading spinner
+      return;
+    }
+
+    // If no data sources configured yet, nothing to fetch
+    if (env.apiConfig.dataConfig.length === 0) {
+      console.log('[App/DataLayer] no dataConfig entries — nothing to fetch');
+      setFetchError(null);
+      setWidgetData({});
       return;
     }
 

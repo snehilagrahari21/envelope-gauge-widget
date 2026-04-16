@@ -136,3 +136,18 @@
   color: var(--text-default-secondary, #666);
   font-style: italic;
 }
+
+/* ── API Config section ─────────────────────────────────────────────── */
+.gauge-config__api-note {
+  color: var(--text-default-secondary, #666);
+}
+
+.gauge-config__api-badge {
+  background: var(--surface-brand-subtle, #e8f0fe);
+  border-radius: 4px;
+  padding: var(--spacing-03, 8px);
+}
+
+.gauge-config__section-label {
+  padding: var(--spacing-02, 4px) 0;
+}

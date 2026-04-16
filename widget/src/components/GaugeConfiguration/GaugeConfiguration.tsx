@@ -88,6 +88,9 @@ const GaugeConfiguration: React.FC<ConfigurationProps> = ({
   const [sensorDropdowns,  setSensorDropdowns]   = useState<Record<number, boolean>>({});
   const [operatorDropdowns,setOperatorDropdowns] = useState<Record<number, boolean>>({});
 
+  // API config dropdown states
+  const [methodDropdownOpen, setMethodDropdownOpen] = useState(false);
+
   // Time tab dropdown states
   const [periodicityOpen, setPeriodicityOpen] = useState(false);
   const [cycleHrOpen,    setCycleHrOpen]    = useState(false);
@@ -220,6 +223,18 @@ const GaugeConfiguration: React.FC<ConfigurationProps> = ({
     emitChange({ ...envelope, apiConfig: { ...apiConfig, dataConfig: newDataConfig } });
   };
 
+  // Update apiConfig base fields (endpoint, method, headers) — shared across all charts
+  const updateApiBase = (updates: Partial<Pick<typeof apiConfig, 'endpoint' | 'method' | 'headers'>>) => {
+    emitChange({ ...envelope, apiConfig: { ...apiConfig, ...updates } });
+  };
+
+  const updateApiHeader = (key: string, value: string) => {
+    emitChange({
+      ...envelope,
+      apiConfig: { ...apiConfig, headers: { ...apiConfig.headers, [key]: value } },
+    });
+  };
+
   const updateStyle = (section: 'card' | 'gauge', updates: Record<string, any>) => {
     emitChange({
       ...envelope,
@@ -346,6 +361,83 @@ const GaugeConfiguration: React.FC<ConfigurationProps> = ({
 
     return (
       <div className="gauge-config__tab-content">
+
+        {/* ── API Configuration — shared for all charts (apiConfig base) ── */}
+        <Accordion mode="multiple" defaultExpandedKeys={[]}>
+          <AccordionItem value="api-config" title="API Configuration">
+            <div className="gauge-config__accordion-body">
+              <div className="gauge-config__api-badge">
+                <span className="BodySmallRegular gauge-config__api-note">
+                  These settings are passed to the DataLayer only — the widget never sees them.
+                </span>
+              </div>
+
+              <TextInput
+                label="Endpoint URL"
+                value={apiConfig.endpoint}
+                onChange={({ value }) => updateApiBase({ endpoint: value })}
+                placeholder="https://..."
+              />
+
+              <SelectInput
+                label="Method"
+                value={apiConfig.method}
+                isOpen={methodDropdownOpen}
+                onClick={() => setMethodDropdownOpen(!methodDropdownOpen)}
+              >
+                <DropdownMenu>
+                  {(['GET', 'POST', 'PUT', 'PATCH', 'DELETE'] as const).map(m => (
+                    <ActionListItem
+                      key={m}
+                      id={m}
+                      title={m}
+                      onClick={() => {
+                        updateApiBase({ method: m });
+                        setMethodDropdownOpen(false);
+                      }}
+                    />
+                  ))}
+                </DropdownMenu>
+              </SelectInput>
+
+              {/* Headers — show each key/value pair */}
+              <div className="gauge-config__section-label">
+                <span className="BodySmallSemibold">Headers</span>
+              </div>
+              {Object.entries(apiConfig.headers).map(([hKey, hVal]) => (
+                <div key={hKey} className="gauge-config__row">
+                  <TextInput
+                    label="Key"
+                    value={hKey}
+                    onChange={() => {}} // key editing is complex; show read-only key
+                    isDisabled
+                  />
+                  <TextInput
+                    label="Value"
+                    value={hVal}
+                    onChange={({ value }) => updateApiHeader(hKey, value)}
+                    placeholder="value or {{placeholder}}"
+                  />
+                </div>
+              ))}
+
+              {/* Response path (from first dataConfig as representative) */}
+              {apiConfig.dataConfig.length > 0 && (
+                <TextInput
+                  label="Response Path"
+                  value={apiConfig.dataConfig[0].responsePath}
+                  onChange={({ value }) => {
+                    // Apply same responsePath to all dataConfig entries
+                    const newDC = apiConfig.dataConfig.map(dc => ({ ...dc, responsePath: value }));
+                    emitChange({ ...envelope, apiConfig: { ...apiConfig, dataConfig: newDC } });
+                  }}
+                  placeholder="e.g. data.data"
+                />
+              )}
+            </div>
+          </AccordionItem>
+        </Accordion>
+
         {/* Chart tabs + add button */}
         <div className="gauge-config__chart-nav">
           <div className="gauge-config__chart-tabs">
