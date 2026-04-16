@@ -20,8 +20,9 @@ import './components/GaugeConfiguration/index';
 import './App.css';
 
 const App: React.FC = () => {
-  const [envelope, setEnvelope] = useState<WidgetConfigEnvelope>(DEFAULT_ENVELOPE);
+  const [envelope, setEnvelope]     = useState<WidgetConfigEnvelope>(DEFAULT_ENVELOPE);
   const [widgetData, setWidgetData] = useState<WidgetData | null>(null);
+  const [fetchError, setFetchError] = useState<string | null>(null);
   const widgetMounted = useRef(false);
   const configMounted = useRef(false);
 
@@ -58,25 +59,33 @@ const App: React.FC = () => {
 
     // Fetch all dataConfig entries in parallel
     const results: WidgetData = {};
-    const fetches = apiConfig.dataConfig.map(async (dc) => {
-      // Replace {{placeholders}} in body
-      const resolvedBody: Record<string, any> = {};
-      for (const [key, val] of Object.entries(dc.body)) {
-        if (val === '{{startTime}}') resolvedBody[key] = resolvedStartTime;
-        else if (val === '{{endTime}}') resolvedBody[key] = resolvedEndTime;
-        else if (val === '{{periodicity}}') resolvedBody[key] = resolvedPeriodicity;
-        else resolvedBody[key] = val;
-      }
+    try {
+      const fetches = apiConfig.dataConfig.map(async (dc) => {
+        // Replace {{placeholders}} in body
+        const resolvedBody: Record<string, any> = {};
+        for (const [key, val] of Object.entries(dc.body)) {
+          if (val === '{{startTime}}') resolvedBody[key] = resolvedStartTime;
+          else if (val === '{{endTime}}') resolvedBody[key] = resolvedEndTime;
+          else if (val === '{{periodicity}}') resolvedBody[key] = resolvedPeriodicity;
+          else resolvedBody[key] = val;
+        }
 
-      console.log('[App/DataLayer] fetching for _id:', dc._id, resolvedBody);
-      const result = await getWidgetData(auth, resolvedBody);
-      console.log('[App/DataLayer] response for _id:', dc._id, result);
-      results[dc._id] = result;
-    });
+        console.log('[App/DataLayer] fetching for _id:', dc._id, resolvedBody);
+        const result = await getWidgetData(auth, resolvedBody);
+        console.log('[App/DataLayer] response for _id:', dc._id, result);
+        results[dc._id] = result;
+      });
 
-    await Promise.all(fetches);
-    console.log('[App/DataLayer] all fetches complete, injecting data', results);
-    setWidgetData(results);
+      await Promise.all(fetches);
+      console.log('[App/DataLayer] all fetches complete, injecting data', results);
+      setFetchError(null);
+      setWidgetData(results);
+    } catch (err: any) {
+      const msg = err?.message ?? 'Failed to load data';
+      console.error('[App/DataLayer] fetch failed:', msg, err);
+      setFetchError(msg);
+      setWidgetData({});
+    }
   }, []);
 
   // Widget event handler — simulates DataLayer listening for onEvent
@@ -115,12 +124,13 @@ const App: React.FC = () => {
       configMounted.current = true;
     }
 
-    // Mount widget — receives ONLY uiConfig + data + onEvent (never apiConfig/auth)
+    // Mount widget — receives ONLY uiConfig + data + error + onEvent (never apiConfig/auth)
     if (!widgetMounted.current) {
       console.log('[App] mounting Gauge widget with uiConfig only');
       rw.Gauge?.mount('widget-preview', {
         config: envelope.uiConfig,
         data: widgetData,
+        error: fetchError,
         onEvent: handleWidgetEvent,
       });
       widgetMounted.current = true;
@@ -130,20 +140,22 @@ const App: React.FC = () => {
     fetchDataLayer(envelope, authentication);
   }, []);
 
-  // ── Update widget when config or data changes ──────────────────────────
+  // ── Update widget when config, data, or error changes ─────────────────
   useEffect(() => {
     if (!widgetMounted.current) return;
-    console.log('[App] updating Gauge widget — uiConfig + data', {
+    console.log('[App] updating Gauge widget — uiConfig + data + error', {
       uiConfig: envelope.uiConfig,
       data: widgetData,
+      error: fetchError,
     });
     const rw = (window as any).ReactWidgets;
     rw?.Gauge?.update('widget-preview', {
       config: envelope.uiConfig,
       data: widgetData,
+      error: fetchError,
       onEvent: handleWidgetEvent,
     });
-  }, [envelope.uiConfig, widgetData, handleWidgetEvent]);
+  }, [envelope.uiConfig, widgetData, fetchError, handleWidgetEvent]);
 
   // ── Update config panel (round-trip) ──────────────────────────────────
   useEffect(() => {

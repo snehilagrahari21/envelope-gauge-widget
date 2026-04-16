@@ -5,14 +5,44 @@
   flex-direction: column;
 }
 
+/* ── State screens ──────────────────────────────────────────────────── */
 .gauge-widget--loading,
-.gauge-widget--empty {
+.gauge-widget--empty,
+.gauge-widget--error {
   display: flex;
+  flex-direction: column;
   align-items: center;
   justify-content: center;
+  gap: var(--spacing-03, 8px);
   min-height: 200px;
+  text-align: center;
+  padding: var(--spacing-05, 16px);
 }
 
+.gauge-widget__empty-icon,
+.gauge-widget__error-icon {
+  font-size: 32px;
+  opacity: 0.4;
+  line-height: 1;
+}
+
+.gauge-widget__empty-title,
+.gauge-widget__error-title {
+  color: var(--text-default-primary, #333);
+}
+
+.gauge-widget__empty-subtitle,
+.gauge-widget__error-message {
+  color: var(--text-default-secondary, #666);
+  max-width: 240px;
+}
+
+.gauge-widget--error .gauge-widget__error-icon {
+  color: var(--feedback-negative-default, #df5353);
+  opacity: 1;
+}
+
+/* ── Header ─────────────────────────────────────────────────────────── */
 .gauge-widget__header {
   display: flex;
   justify-content: space-between;
@@ -22,8 +52,15 @@
 
 .gauge-widget__title {
   color: var(--text-default-primary, #333);
+  flex: 1;
 }
 
+.gauge-widget__chart-selector {
+  width: 160px;
+  flex-shrink: 0;
+}
+
+/* ── Time row — local picker ─────────────────────────────────────────── */
 .gauge-widget__time-row {
   display: flex;
   flex-direction: row;
@@ -41,6 +78,31 @@
   flex-shrink: 0;
 }
 
+/* ── Time row — fixed display ───────────────────────────────────────── */
+.gauge-widget__time-fixed {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: var(--spacing-02, 4px);
+  padding-bottom: var(--spacing-03, 8px);
+  flex-wrap: wrap;
+}
+
+.gauge-widget__time-badge {
+  background: var(--surface-default-secondary, #f5f5f5);
+  border: 1px solid var(--border-default-secondary, #e0e0e0);
+  border-radius: 4px;
+  padding: 2px 8px;
+  color: var(--text-default-secondary, #666);
+  font-size: 12px;
+}
+
+.gauge-widget__time-sep {
+  color: var(--text-default-secondary, #666);
+  font-size: 12px;
+}
+
+/* ── Chart area ─────────────────────────────────────────────────────── */
 .gauge-widget__chart {
   flex: 1;
   width: 100%;

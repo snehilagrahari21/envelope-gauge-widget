@@ -103,6 +103,8 @@ export interface TimeDisplayConfig {
   defaultPeriodicity: 'minute' | 'hourly' | 'daily' | 'weekly' | 'monthly';
   allDurations: DurationOption[];
   defaultDurationLabel: string;
+  fixedStartTime?: string | null;
+  fixedEndTime?: string | null;
 }
 
 export interface GaugeUIConfig {
@@ -139,6 +141,7 @@ export interface WidgetProps {
   config: GaugeUIConfig;                    // uiConfig only — widget never sees apiConfig
   data: WidgetData | null;                  // null = loading, DataLayer injects after fetch
   onEvent: (event: WidgetEvent) => void;    // emit interactions, never re-fetch
+  error?: string | null;                    // DataLayer sets on fetch failure
 }
 
 // === Configuration Props ===
@@ -230,6 +233,6 @@ export const DEFAULT_UI_CONFIG: GaugeUIConfig = {
 
 export const DEFAULT_ENVELOPE: WidgetConfigEnvelope = {
   timeConfig: DEFAULT_TIME_CONFIG,
-  apiConfig: DEFAULT_API_CONFIG,
-  uiConfig: DEFAULT_UI_CONFIG,
+  apiConfig: { ...DEFAULT_API_CONFIG, dataConfig: [] },
+  uiConfig: { ...DEFAULT_UI_CONFIG, charts: [] },
 };

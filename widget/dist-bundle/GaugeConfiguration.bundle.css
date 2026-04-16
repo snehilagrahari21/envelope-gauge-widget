@@ -63,3 +63,77 @@
   border-radius: var(--global-border-radius-medium, 4px);
 }
 
+/* ── Chart nav (multi-chart tabs + add/remove) ──────────────────────── */
+.gauge-config__chart-nav {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: var(--spacing-03, 8px);
+  padding-bottom: var(--spacing-03, 8px);
+  border-bottom: 1px solid var(--border-default-secondary, #e0e0e0);
+  flex-wrap: wrap;
+}
+
+.gauge-config__chart-tabs {
+  display: flex;
+  flex-direction: row;
+  gap: var(--spacing-02, 4px);
+  flex-wrap: wrap;
+  flex: 1;
+}
+
+.gauge-config__chart-tab {
+  padding: 4px 12px;
+  border-radius: 4px;
+  border: 1px solid var(--border-default-secondary, #e0e0e0);
+  background: transparent;
+  cursor: pointer;
+  font-size: 13px;
+  color: var(--text-default-secondary, #666);
+  transition: background 0.1s, color 0.1s;
+}
+
+.gauge-config__chart-tab:hover {
+  background: var(--surface-default-secondary, #f5f5f5);
+}
+
+.gauge-config__chart-tab--active {
+  background: var(--surface-brand-subtle, #e8f0fe);
+  color: var(--text-brand-default, #1a73e8);
+  border-color: var(--border-brand-default, #1a73e8);
+  font-weight: 600;
+}
+
+.gauge-config__chart-actions {
+  display: flex;
+  gap: var(--spacing-02, 4px);
+  flex-shrink: 0;
+}
+
+/* ── No-charts empty state ──────────────────────────────────────────── */
+.gauge-config__no-charts {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--spacing-04, 12px);
+  padding: var(--spacing-07, 32px) var(--spacing-04, 12px);
+  text-align: center;
+  color: var(--text-default-secondary, #666);
+}
+
+/* ── Duration item ──────────────────────────────────────────────────── */
+.gauge-config__duration-item {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-03, 8px);
+  padding: var(--spacing-03, 8px);
+  border: 1px solid var(--border-default-secondary, #e0e0e0);
+  border-radius: 4px;
+}
+
+.gauge-config__hint {
+  color: var(--text-default-secondary, #666);
+  font-style: italic;
+}
+
