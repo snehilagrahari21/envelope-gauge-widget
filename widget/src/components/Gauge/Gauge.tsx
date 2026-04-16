@@ -109,6 +109,11 @@ const Gauge: React.FC<WidgetProps> = ({ config: configProp, data, onEvent, error
 
   const handleRangeChange = (range: DateRange | null) => {
     if (!range) return;
+    console.log('[Gauge] DatePicker Apply clicked — range selected', {
+      start: range.start.toISOString(),
+      end:   range.end.toISOString(),
+      periodicity,
+    });
     setDateRange(range);
     emitTimeChange(range, periodicity);
   };
