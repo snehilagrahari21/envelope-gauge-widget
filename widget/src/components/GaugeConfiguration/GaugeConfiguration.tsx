@@ -95,7 +95,18 @@ const GaugeConfiguration: React.FC<ConfigurationProps> = ({
   // Emit onChange — always emits the full three-key envelope
   const emitChange = useCallback(
     (updated: WidgetConfigEnvelope) => {
-      console.log('[GaugeConfig] emitChange — full envelope emitted', updated);
+      console.group('[GaugeConfig] emitChange — envelope produced');
+      console.log('timeConfig:', JSON.parse(JSON.stringify(updated.timeConfig)));
+      console.log('apiConfig:', JSON.parse(JSON.stringify(updated.apiConfig)));
+      console.log('apiConfig.dataConfig:', JSON.parse(JSON.stringify(updated.apiConfig.dataConfig)));
+      console.log('uiConfig:', JSON.parse(JSON.stringify(updated.uiConfig)));
+      console.log('uiConfig.charts:', JSON.parse(JSON.stringify(updated.uiConfig.charts)));
+      console.log('_id match check:', {
+        'apiConfig._id': updated.apiConfig.dataConfig.map(d => d._id),
+        'uiConfig._id': updated.uiConfig.charts.map(c => c._id),
+        match: updated.apiConfig.dataConfig.every((d, i) => d._id === updated.uiConfig.charts[i]?._id),
+      });
+      console.groupEnd();
       setEnvelope(updated);
       onChange(updated);
     },
